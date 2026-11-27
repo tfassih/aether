@@ -1,0 +1,82 @@
+name: Windows desktop release
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['VERSION', 'main.py', 'aether/**', 'packaging/**', 'tests/**', 'pyproject.toml', 'requirements*.txt']
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: 'requirements*.txt'
+      - name: Install build environment
+        run: python -m pip install -r requirements-build.txt
+      - name: Check source and run tests
+        run: |
+          python -m ruff check .
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python -m pytest -q
+      - name: Build installer and portable archive
+        run: ./packaging/build.ps1
+      - name: Keep distribution for Windows 11 verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/release/*
+          if-no-files-found: error
+          compression-level: 0
+  windows11:
+    needs: build
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/release
+      - name: Exercise the distributed x64 files on Windows 11
+        run: ./packaging/verify.ps1
+  publish:
+    needs: windows11
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/release
+      - name: Publish verified binaries for a new version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(tr -d '\r\n' < VERSION)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="v$version"
+          if gh release view "$tag" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/draft"; then
+            if [[ $(cat "$RUNNER_TEMP/draft") == false ]]; then
+              echo "Release $tag is already published."
+              exit 0
+            fi
+            echo "A draft already exists for $tag; inspect it before publishing." >&2
+            exit 1
+          fi
+          gh release create "$tag" dist/release/* --target "$GITHUB_SHA" --title "Aether $version" --notes-file packaging/release-notes.md --latest
