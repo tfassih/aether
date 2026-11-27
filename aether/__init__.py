@@ -1,0 +1,1 @@
+"""Aether desktop game library."""

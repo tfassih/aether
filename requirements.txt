@@ -1,0 +1,10 @@
+nicegui==3.19.0
+pywebview>=6,<7; sys_platform == 'win32'
+httpx[socks]==0.28.1
+keyring>=25,<26
+pefile==2024.8.26
+Pillow>=11,<14
+platformdirs>=4,<5
+psutil>=6,<8
+RapidFuzz>=3.10,<4
+watchdog>=5,<7
