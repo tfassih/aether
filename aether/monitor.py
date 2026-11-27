@@ -51,6 +51,9 @@ def scan(db, folder, parts=None):
         except OSError as exc:
             seen.add(key)
             failures.append(f"{p.name}: {exc}")
+    if not root.is_dir():
+        db.scan_result(folder, [], [], [], "Offline", "Source disconnected during the scan", full=True)
+        return
     scope = (
         existing if parts is None or folder["mode"] == "single" else existing & {path_key(p) for p in targets}
     )

@@ -123,3 +123,18 @@ def test_matching_and_image_validation(tmp_path):
         assert im.format == "WEBP" and im.size == (32, 24)
     with pytest.raises(MetadataError):
         save_image(b"not an image", tmp_path)
+
+
+def test_background_lookup_respects_keep_local_during_request(tmp_path):
+    db = setup_games(tmp_path)
+    gid = db.library()[0]["id"]
+
+    def response(_):
+        meta.set_state(gid, "Local")
+        return httpx.Response(200, json={"id": 42, "name": "Orbit"})
+
+    meta = Metadata(db, FixtureKey(), httpx.MockTransport(response))
+    meta.match(gid, 42, automatic=True)
+    meta.set_state(gid, "Review", automatic=True)
+    assert db.game(gid)["rawg_id"] is None and db.game(gid)["match_state"] == "Local"
+    meta.stop()

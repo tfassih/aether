@@ -228,7 +228,10 @@ class Metadata:
                 "platforms": names([v.get("platform") or {} for v in info.get("platforms") or []]),
                 "rawg_slug": slug if re.fullmatch(r"[a-zA-Z0-9_-]+", slug) else "",
             }
-            gid = self.db.apply_match(gid, rawg_id, data)
+            target = self.db.apply_match(gid, rawg_id, data, automatic=automatic)
+            if target is None:
+                return gid, 0
+            gid = target
             urls = [("background", info["background_image"])] if info.get("background_image") else []
             missing = 0
             try:
@@ -247,11 +250,12 @@ class Metadata:
                     missing += 1
             return gid, missing
 
-    def set_state(self, gid, state):
+    def set_state(self, gid, state, *, automatic=False):
         with self.db.connection(True) as db:
             db.execute(
-                "UPDATE games SET match_state=?,attempted=? WHERE id=? AND rawg_id IS NULL",
-                (state, time.time(), gid),
+                """UPDATE games SET match_state=?,attempted=? WHERE id=? AND rawg_id IS NULL
+                   AND (?=0 OR match_state IN ('New','Retry'))""",
+                (state, time.time(), gid, automatic),
             )
 
     def start(self):
@@ -295,9 +299,9 @@ class Metadata:
                             ):
                                 self.match(item["id"], hits[0]["id"], automatic=True)
                             else:
-                                self.set_state(item["id"], "Review")
+                                self.set_state(item["id"], "Review", automatic=True)
                         except MetadataError:
-                            self.set_state(item["id"], "Retry")
+                            self.set_state(item["id"], "Retry", automatic=True)
                             wait = 30
             except Exception:
                 log.exception("Metadata processing failed")

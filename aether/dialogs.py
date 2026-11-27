@@ -14,7 +14,7 @@ def action(text, icon, handler, *, quiet=False):
         # Refreshing the game grid can delete the button while its asynchronous action is running.
         with client:
             result = handler()
-            if inspect.isawaitable(result):
+            if inspect.iscoroutine(result):
                 await result
 
     return (

@@ -110,6 +110,7 @@ class Playtime:
                                 continue
                 except psutil.Error:
                     continue
+            continuing = set(active)
             if external or live:
                 for process in psutil.process_iter(["exe", "create_time", "status"], ad_value=None):
                     try:
@@ -125,6 +126,14 @@ class Playtime:
             for iid, (pid, born) in active.items():
                 if iid not in live:
                     self._begin(iid, pid, born, now)
+                elif iid not in continuing and now - live[iid]["seen"] >= 8 and born > live[iid]["seen"]:
+                    # Another process started while Aether was closed. Leave the unobserved gap uncounted.
+                    with self.db.connection(True) as db:
+                        db.execute("UPDATE sessions SET end=seen WHERE id=?", (live[iid]["id"],))
+                        db.execute(
+                            "INSERT INTO sessions(installation,start,seen,pid,born) VALUES(?,?,?,?,?)",
+                            (iid, now, now, pid, born),
+                        )
                 else:
                     with self.db.connection(True, notify=False) as db:
                         db.execute(

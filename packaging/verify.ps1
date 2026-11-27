@@ -1,7 +1,12 @@
+param([switch]$NativeX64)
 $ErrorActionPreference = 'Stop'
 $os = Get-CimInstance Win32_OperatingSystem
 Write-Host "$($os.Caption) build $($os.BuildNumber) ($($os.OSArchitecture))"
-if ($os.ProductType -ne 1 -or [int]$os.BuildNumber -lt 22000) { throw 'A Windows 11 client is required for this check.' }
+if ($NativeX64) {
+    if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'X64') { throw 'Native x64 verification requires an x64 OS.' }
+} elseif ($os.ProductType -ne 1 -or [int]$os.BuildNumber -lt 22000) {
+    throw 'The client-platform check requires Windows 11.'
+}
 
 $release = (Resolve-Path "$PSScriptRoot/../dist/release").Path
 $testRoot = New-Item -ItemType Directory (Join-Path ([IO.Path]::GetTempPath()) "Aether QA $([guid]::NewGuid())")
@@ -19,7 +24,7 @@ function Test-PackagedUi([string]$exe, [string]$name) {
         if (!(Test-Path $report)) { throw "$name exited before reporting the native UI result (exit $($process.ExitCode))." }
         $result = Get-Content $report -Raw | ConvertFrom-Json
         Write-Host ($result | ConvertTo-Json -Compress)
-        if (!$result.ok -or !$result.library -or $result.engine -notmatch 'Edg/') { throw "$name did not pass its WebView2 check." }
+        if (!$result.ok -or !$result.library -or !$result.dialogs -or $result.engine -notmatch 'Edg/') { throw "$name did not pass its WebView2 check." }
         if ($process.ExitCode -ne 0) { throw "$name exited with code $($process.ExitCode)." }
     } finally {
         if (!$process.HasExited) { taskkill /PID $process.Id /T /F }

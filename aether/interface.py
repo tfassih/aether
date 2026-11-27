@@ -4,6 +4,7 @@ import hashlib
 import math
 import time
 from functools import partial
+from pathlib import Path
 
 from nicegui import run, ui
 
@@ -119,6 +120,8 @@ class Shell:
         self.query = self.genre = self.platform = self.tag = ""
         self.nav()
         self.main.clear()
+        with self.main:
+            ui.run_javascript("window.scrollTo(0, 0)")
         names = {
             "library": "Library",
             "favorites": "Favorites",
@@ -443,6 +446,11 @@ class Shell:
                         play_button = action("Play", "play_arrow", play)
                         if state in {"Offline", "Missing", "Ignored", "Paused", "Removed"} or g["playing"]:
                             play_button.disable()
+                        elif not (Path(inst["path"]) / p["executable"]).is_file():
+                            play_button.disable()
+                            play_button.tooltip(
+                                "The approved executable is missing. Edit the profile to choose another."
+                            )
                         action(
                             "Edit", "tune", lambda inst=inst, p=p: profile_dialog(self, inst, p), quiet=True
                         )

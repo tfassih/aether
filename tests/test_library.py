@@ -210,3 +210,47 @@ def test_partial_scan_and_stale_observation(source, monkeypatch):
     db.configure_folder(f["id"], False, 3, [])
     scan(db, f)
     assert db.folders()[0]["status"] == "Paused"
+
+
+def test_restarted_game_does_not_bridge_stale_playtime(source, monkeypatch):
+    from types import SimpleNamespace
+
+    import psutil
+
+    db, root, f = source
+    exe = put(root / "Nova" / "Nova.exe")
+    scan(db, f)
+    iid = db.installations(db.library()[0]["id"])[0]["id"]
+    db.approve(iid, "Main", "Nova.exe", [])
+    with db.connection(True) as conn:
+        conn.execute(
+            "INSERT INTO sessions(installation,start,seen,pid,born) VALUES(?,?,?,?,?)",
+            (iid, 10.0, 15.0, 9999999, 10.0),
+        )
+    process = SimpleNamespace(
+        pid=98765, info={"exe": str(exe), "create_time": time.time() - 1, "status": "running"}
+    )
+    monkeypatch.setattr(psutil, "process_iter", lambda *a, **kw: [process])
+    Playtime(db).poll()
+    rows = db.rows("SELECT start,end FROM sessions ORDER BY id")
+    assert rows[0] == {"start": 10.0, "end": 15.0}
+    assert len(rows) == 2 and rows[1]["end"] is None
+    assert db.library()[0]["seconds"] == 5
+
+
+def test_source_disconnect_during_scan_retains_installation(source, monkeypatch):
+    from aether import monitor
+
+    db, root, f = source
+    put(root / "Nova" / "Nova.exe")
+    scan(db, f)
+
+    def unplug(*args):
+        root.rename(root.with_name("Disconnected"))
+        raise FileNotFoundError("source disconnected")
+
+    monkeypatch.setattr(monitor, "observe", unplug)
+    scan(db, f)
+    game = db.library()[0]
+    assert db.folders()[0]["status"] == "Offline" and not game["installed"]
+    assert db.installations(game["id"])[0]["status"] == "Installed"

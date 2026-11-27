@@ -31,6 +31,8 @@ jobs:
           python -m pytest -q
       - name: Build installer and portable archive
         run: ./packaging/build.ps1
+      - name: Exercise the packaged binaries on native Windows x64
+        run: ./packaging/verify.ps1 -NativeX64
       - name: Keep distribution for Windows 11 verification
         uses: actions/upload-artifact@v4
         with:

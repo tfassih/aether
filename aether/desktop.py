@@ -88,7 +88,7 @@ async def smoke(result, native_window):
 
         def click(text):
             label = json.dumps(text)
-            return f"(() => {{const b=[...document.querySelectorAll('button')].find(e=>(e.querySelector('.block')?.textContent || e.innerText.trim().split('\\n').pop()).toLowerCase()==={label}.toLowerCase() && e.offsetWidth); if(b){{b.click();return true}}return false}})()"
+            return f"(() => {{const b=[...document.querySelectorAll('button')].reverse().find(e=>(e.querySelector('.block')?.textContent || e.innerText.trim().split('\\n').pop()).toLowerCase()==={label}.toLowerCase() && e.offsetWidth); if(b){{b.click();return true}}return false}})()"
 
         await wait_js("document.querySelector('.page-title')?.textContent === 'Game library'")
         outcome["engine"] = await wait_js("navigator.userAgent")
@@ -110,12 +110,25 @@ async def smoke(result, native_window):
             await client.run_javascript("document.querySelector('.game-card').click()")
             await wait_js("document.body.innerText.includes('Installations & launch profiles')")
             if not await client.run_javascript(
-                "!![...document.querySelectorAll('button')].find(e=>(e.querySelector('.block')?.textContent || e.innerText.trim().split('\\n').pop()).toLowerCase()==='play')"
+                "!![...document.querySelectorAll('button')].reverse().find(e=>(e.querySelector('.block')?.textContent || e.innerText.trim().split('\\n').pop()).toLowerCase()==='play')"
             ):
                 await wait_js(click("Add profile"))
                 await wait_js(click("Approve profile"))
-            await wait_js("document.body.innerText.includes('Probe.exe')")
+            await wait_js(
+                "!document.querySelector('.q-dialog__backdrop') && document.body.innerText.includes('Probe.exe')"
+            )
+            await wait_js(
+                "[...document.querySelectorAll('button .block')].some(e => e.textContent === 'Play')"
+            )
             outcome["library"] = "scanned and opened a game with an approved profile"
+            await wait_js(click("Game folders"))
+            await wait_js(click("Manage"))
+            await wait_js(
+                "[...document.querySelectorAll('.q-dialog .dialog-title')].some(e => e.textContent === 'Manage source')"
+            )
+            await wait_js(click("Cancel"))
+            await wait_js("!document.body.innerText.includes('Manage source')")
+            outcome["dialogs"] = "opened and closed source settings"
         await wait_js(click("Settings"))
         await wait_js(
             "document.querySelector('.page-title')?.textContent === 'Settings' && document.body.innerText.includes('RAWG API key')"

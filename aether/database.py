@@ -324,9 +324,11 @@ class Database:
                 (gid, kind, file, source),
             )
 
-    def apply_match(self, gid, rawg_id, data):
+    def apply_match(self, gid, rawg_id, data, *, automatic=False):
         with self.connection(True) as db:
             old = db.execute("SELECT * FROM games WHERE id=?", (gid,)).fetchone()
+            if automatic and (old is None or old["rawg_id"] is not None or old["match_state"] == "Local"):
+                return None
             if old is None:
                 raise ValueError("The library changed. Open the game again.")
             target = db.execute("SELECT * FROM games WHERE rawg_id=? AND id!=?", (rawg_id, gid)).fetchone()

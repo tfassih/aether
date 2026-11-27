@@ -44,6 +44,6 @@ python -m ruff check .
 .\packaging\build.ps1
 ```
 
-The installer, portable ZIP and SHA-256 manifest are written to `dist/release`. The GitHub Actions workflow builds the x64 binaries on Windows, exercises both distributions in the native WebView2 window on a separate Windows 11 Arm runner using x64 emulation, and checks silent install/uninstall and data persistence. When the version in `VERSION` has no published release, a successful workflow on `main` publishes that commit and the verified files. Change `VERSION` and the release notes together for a new release.
+The installer, portable ZIP and SHA-256 manifest are written to `dist/release`. The GitHub Actions workflow builds the x64 binaries and exercises both distributions on a Windows x64 runner and a separate Windows 11 Arm runner using x64 emulation. Both machines check the native WebView2 interface, silent install/uninstall and data persistence. When the version in `VERSION` has no published release, a successful workflow on `main` publishes that commit and the verified files. Change `VERSION` and the release notes together for a new release.
 
 Aether uses the license in [LICENSE](LICENSE). External game metadata and artwork are provided by [RAWG](https://rawg.io/) and their respective owners.
